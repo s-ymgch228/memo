@@ -1,29 +1,35 @@
 # Fedora 30 上で LXD を使ってみた時のメモ
-## install
-snapd を入れる。 snap はディストリビューションに寄らずパッケージをインストールできる仕組み(インストール中は ld が動いていたので pkgsrc 的な感じがする)
-インストールした後に systemctl で snmpd.seeded を呼び出す。これは初期化っぽいやつで、終わると exit され、デーモン化しない。
-```
-sudo dnf -y install snapd
-sudo systemctl start snapd.seeded.service
-```
+lxd/lxc を Fedora 30 上で実行して shell が触れるようにする
 
-lxd 本体を入れる。
+## install
+### 0. snapd をインストールする
+LXD は Ubuntu 系が主に開発しているため yum/dnf でサクッとインストールできない。
+そこで、ディストリビューションに依存しないでインストールできる仕組みの snapd を使う。
+
+snapd は dnf を使ってインストールする。
+```
+% sudo dnf -y install snapd
+% sudo systemctl start snapd.seeded.service
+```
+snapd を入れた後は snapd.seeded を起動して初期化っぽいことをする。
+snapd.seeded は実行完了するとそのまま exit される。
+
+### 1. LXD をインストールする
+snapd を使って lxd 本体を入れる。
 ```
 snap install lxd
 ```
 バージョン指定するには `--channel=3.0/stable` を lxd の後につける
 
+lxd は lxd グループに属するアカウントにローカル接続を許可するので通常使うユーザのアカウントを lxd グループに加える
 ```
 sudo gpasswd -a <username> lxd
 ```
-lxd は lxd グループに属するアカウントにローカル接続を許可するので通常使うユーザのアカウントを lxd グループに加える
-
+### 2. LXDを初期化する
+lxd は使う前に初期化する必要がある。
+初期化は `lxd init` コマンドを使う。
 ```
-lxd init
-```
-はじめは init でコンフィグを作る
-
-```
+% lxd init
 Would you like to use LXD clustering? (yes/no) [default=no]: no
 Do you want to configure a new storage pool? (yes/no) [default=yes]: yes
 Name of the new storage pool [default=default]: default
@@ -36,16 +42,30 @@ What IPv4 address should be used? (CIDR subnet notation, “auto” or “none�
 What IPv6 address should be used? (CIDR subnet notation, “auto” or “none”)
 [default=auto]: none
 Would you like LXD to be available over the network? (yes/no)
-[default=no]: no　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　　<===== コンテナから直接ネットワークに出ていかなければ no でいいはず
+[default=no]: no　　　　　　　　　　　　　　　　　　　　<===== コンテナから直接ネットワークに出ていかなければ no でいいはず
 Would you like stale cached images to be updated automatically? (yes/no)
 [default=yes] yes
 Would you like a YAML "lxd init" preseed to be printed? (yes/no)
 [default=no]: no
+%
 ```
 
-カーネル起動時のパラメタに lxc で使う namespace の設定を入れる。これはもしかすると Fedora30 では不要(default enable)かも
-/etc/default/grub に `user_namespace.enable=1` と `namespace.unpriv_enable=1` を足す
-grub の update は `grub2-mkconfig -o /boot/efi/EFI/fedora/grub.cfg` (BIOS boot は /boot/grub2/grub.cfg)
+### 3 Linux カーネル起動時のパラメタに namespace を有効化する値を追加する
+namespace はカーネルの機能を lxc ごとに分割できるように名前を付けるような機能(多分)。これは起動時のパラメタで設定する。
+```
+% sudo vi /etc/default/grub
+...
+GRUB_CMDLINE_LINUX="resume=/dev/mapper/fedora-swap rd.lvm.lv=fedora/root rd.lvm.lv=fedora/swap rhgb quiet user_namespace.enable=1 namespace.unpriv_enable=1"
+...
+```
+`/etc/default/grub` の中に書かれている GRUB_CMDLINE_LINIUX に `user_namespace.enable=1` と `namespace.unpriv_enable=1` を追加する。
+追加が終わったら grub の設定ファイルに反映する
+
+```
+% sudo grub2-mkconfig -o /boot/efi/EFI/fedora/grub.cfg
+```
+`/boot/efi/...` は UEFI boot の場合に読み込まれるフォルダ。 BIOS 起動の場合はパスが違う。
+
 ## 使い方
 
 `lxc image list images:` コマンドで公開されているコンテナのイメージ一覧が見れる。はじめはこのリストから作るコンテナのイメージを決める。
