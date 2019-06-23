@@ -42,7 +42,7 @@ What IPv4 address should be used? (CIDR subnet notation, “auto” or “none�
 What IPv6 address should be used? (CIDR subnet notation, “auto” or “none”)
 [default=auto]: none
 Would you like LXD to be available over the network? (yes/no)
-[default=no]: no　　　　　　　　　　　　　　　　　　　　<===== コンテナから直接ネットワークに出ていかなければ no でいいはず
+[default=no]: no　　　　　　　　　　　　　　　　　　　　<===== コンテナが直接ネットワークに接続するかどうか？
 Would you like stale cached images to be updated automatically? (yes/no)
 [default=yes] yes
 Would you like a YAML "lxd init" preseed to be printed? (yes/no)
@@ -52,6 +52,7 @@ Would you like a YAML "lxd init" preseed to be printed? (yes/no)
 
 ### 3 Linux カーネル起動時のパラメタに namespace を有効化する値を追加する
 namespace はカーネルの機能を lxc ごとに分割できるように名前を付けるような機能(多分)。これは起動時のパラメタで設定する。
+(そもそもこの設定が必要かどうかはわからない)
 ```
 % sudo vi /etc/default/grub
 ...
@@ -65,10 +66,12 @@ GRUB_CMDLINE_LINUX="resume=/dev/mapper/fedora-swap rd.lvm.lv=fedora/root rd.lvm.
 % sudo grub2-mkconfig -o /boot/efi/EFI/fedora/grub.cfg
 ```
 `/boot/efi/...` は UEFI boot の場合に読み込まれるフォルダ。 BIOS 起動の場合はパスが違う。
+update した後は reboot して反映する。
 
 ## 使い方
-
-`lxc image list images:` コマンドで公開されているコンテナのイメージ一覧が見れる。はじめはこのリストから作るコンテナのイメージを決める。
+### コンテナのイメージを決める
+`lxc image list images:` コマンドで公開されているコンテナのイメージ一覧が見れる。
+はじめはこのリストから作るコンテナのイメージを決める。
 
 
 ```
@@ -95,6 +98,7 @@ GRUB_CMDLINE_LINUX="resume=/dev/mapper/fedora-swap rd.lvm.lv=fedora/root rd.lvm.
 | alpine/3.8 (3 more)                  | 7d7dd381bf08 | yes    | Alpine 3.8 amd64 (20190619_13:00)            | x86_64  | 2.34MB    | Jun 19, 2019 at 12:00am (UTC) |
 ...
 ```
+この一覧は特定のディストリビューションだけフィルタすることもできる。
 
 例えば、CentOS のイメージだけが見たければ `lxc image list imgases:centos` のようにする
 
@@ -120,21 +124,27 @@ $ lxc image list images:centos
 $
 ```
 
-コンテナを作るコマンドは `lxc launch <イメージ名> <コンテナ名>` とする。
-公開されているイメージを使うときは `<イメージ名>` は `images:<ALIAS>` とする。`<ALIAS>` は `lxc images list ...` で出てきた ALIAS の列の文字列。
+### コンテナを作る
+起動するイメージが決まったら、ALIAS のところに書かれている名前を使ってコンテナを作る。
 
+コマンドは `lxc launch <イメージ名> <コンテナ名>`。
 例えば CentOS7 を作るときは `lxc launch images:centos/7 \<コンテナ名>` のように指定する。
+ここではコンテナの名前は `cent7-0` とする。
+
 ```
 $ lxc launch images:centos/7 cent7-0
 Creating cent7-0
 Starting cent7-0
 $
 ```
-ここではコンテナの名前は `cent7-0` とした。
+コンテナのイメージはインターネットに公開されているものを取得するため、そこそこ時間がかかる。
+"Starting ..." が出ればコンテナは実行されている状態になる。
 
-`lxc image export <???>` を使えばコンテナからイメージを作ることができる？ # そのうち確認する。
+### コンテナ上でコマンドを実行する
+起動したコンテナ上でコマンドを実行するには "lxc exec" コマンドを使う。
+exec は `lxc exec \<コンテナ名> \<コマンド> [オプション...]` のように使う。
 
-コンテナ上でコマンドを実行するには `lxc exec <コンテナ名> <command> [<args...>]` のようにする
+例えば、 "ip address show" コマンドを作ったコンテナy像で実行するには以下のようにする。
 ```
 $ lxc exec cent7-0 ip a s
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
@@ -154,14 +164,17 @@ $ lxc exec cent7-0 ip a s
 $
 ```
 
-毎回コマンド打つのがめんどくさければ `<command>` にシェルを指定すればいい
-
+実行するコマンドに bash などのシェルを command に指定してもいい。
 ```
 $lxc exec cent7-0 bash
 [root@cent7-0 ~]#
 ```
+コマンドを複数実行するときとかはこれが便利。
 
-コンテナを止めるには ` lxc stop <コンテナ名>`　とする
+### コンテナを停止する
+実行するプログラムがなくなったときなどは ` lxc stop <コンテナ名>` でコンテナを止めることができる。
+一度止めたコンテナは、保存したファイルなどの情報はそのままにコマンドやプログラムが実行されていない状態になる。
+これは、通常のOSの電源 off をした時と同じような状態。
 ```
 $ lxc stop cent7-0
 To start your first container, try: lxc launch ubuntu:18.04
@@ -170,55 +183,10 @@ $
 ```
 
 このままだとイメージは残ったままでまた起動すれば再開する。
-完全に消したければ `lxc delete <コンテナ名>`　とする。
-## 実例
-ホストに保存されてる適当なファイルをコンテナ上の httpd で公開する
-
-### コンテナを作ってに http サーバを立てる
-(CentOS7 の場合) パッケージのリストに nginx がないので入れるところからやる
-```
-$ lxc launch images:centos/7 httpd0
-Creating httpd0
-Starting httpd0 
-$ lxc exec httpd0 bash
-[root@httpd0 ~]# cat > /etc/yum.repo.d/nginx.repo << _EOF
-[nginx]
-name=nginx repo
-baseurl=http://nginx.org/packages/mainline/centos/7/\$basearch/
-gpgcheck=0
-enabled=1
-_EOF
-[root@httpd0 ~]# yum search nginx
-...
-nginx.x86_64 : High performance web server
-...
-[root@httpd0 ~]# yum install -y nginx
-...
-* http://nginx.com/products/
-
-----------------------------------------------------------------------
-    1/3   Verifying  : 1:nginx-1.17.0-1.el7.ngx.x86_64
-    2/3   Verifying  : 1:openssl-1.0.2k-16.el7_6.1.x86_64
-    3/3   Verifying  : 1:make-3.82-23.el7.x86_64
-
-Installed:
-  nginx.x86_64 1:1.17.0-1.el7.ngx
-Dependency Installed:
-  make.x86_64 1:3.82-23.el7
-  openssl.x86_64 1:1.0.2k-16.el7_6.1
-
-Complete!
-[root@httpd0 ~]#
-```
-### ホストとコンテナ間でディレクトリを共有する
-TBA
-
-### コンテナ上に http サーバを立てる
-(CentOS7 の場合) パッケージのリストに nginx がないので入れるところからやる
-```
-$ lxc launch images:centos/7
-
-```
+## 備忘録
+ - `lxc image export <???>` を使えばコンテナからイメージを作ることができる？
+    - そのうち確認する
+ - 完全に消したければ `lxc delete <コンテナ名>`　とする。
 
 # 参考にしたサイト
  - https://www.hiroom2.com/2018/12/14/fedora-29-lxd-en/
