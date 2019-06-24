@@ -61,7 +61,7 @@ source, path はぞれぞれホストのパスとコンテナ側のパスを指�
 Note: [コンテナ - LXDドキュメント翻訳プロジェクト](https://lxd-ja.readthedocs.io/ja/latest/containers/)
 
 ```
-lxc config device add httpd0 http_root disk
+lxc config device add httpd0 http_root disk source=/var/lib/httproot path=/mnt/http_root
 ```
 
 
