@@ -12,7 +12,7 @@
 ```
 ホストに保存されてる適当なファイルをコンテナ上の httpd で公開する
 
-### コンテナを作ってに http サーバを立てる
+### 適当なコンテナを作る
 (CentOS7 の場合) パッケージのリストに nginx がないので入れるところからやる
 ```
 $ lxc launch images:centos/7 httpd0
@@ -48,7 +48,23 @@ Dependency Installed:
 Complete!
 [root@httpd0 ~]#
 ```
+
 ### ホストとコンテナ間でディレクトリを共有する
+ホストと共有するディレクトリはコンテナ側から見るとデバイスとして追加される。
+利用するコマンドは "lxc config device add"　で、以下のような形式をとる。
+```
+lxc config device add \<コンテナ名> \<デバイス名> \<デバイスのタイプ> soure=/path/to/hostdir path=/path/to/container/dir
+```
+\<コンテナ名> は作ったコンテナの名前、\<デバイス名> は追加するデバイスの取り外しなどで指定する適当な名前を指定する。
+source, path はぞれぞれホストのパスとコンテナ側のパスを指定する
+
+Note: [コンテナ - LXDドキュメント翻訳プロジェクト](https://lxd-ja.readthedocs.io/ja/latest/containers/)
+
+```
+lxc config device add httpd0 http_root disk
+```
+
+
 TBA
 
 ### コンテナ上に http サーバを立てる
