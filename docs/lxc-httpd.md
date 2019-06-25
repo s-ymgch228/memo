@@ -53,7 +53,7 @@ Complete!
 ホストと共有するディレクトリはコンテナ側から見るとデバイスとして追加される。
 利用するコマンドは "lxc config device add"　で、以下のような形式をとる。
 ```
-lxc config device add \<コンテナ名> \<デバイス名> \<デバイスのタイプ> soure=/path/to/hostdir path=/path/to/container/dir
+lxc config device add <コンテナ名> <デバイス名> <デバイスのタイプ> soure=/path/to/hostdir path=/path/to/container/dir
 ```
 \<コンテナ名> は作ったコンテナの名前、\<デバイス名> は追加するデバイスの取り外しなどで指定する適当な名前を指定する。
 source, path はぞれぞれホストのパスとコンテナ側のパスを指定する
