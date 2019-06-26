@@ -12,7 +12,7 @@
 ```
 ホストに保存されてる適当なファイルをコンテナ上の httpd で公開する
 
-### 適当なコンテナを作る
+## 適当なコンテナを作る
 (CentOS7 の場合) パッケージのリストに nginx がないので入れるところからやる
 ```
 $ lxc launch images:centos/7 httpd0
@@ -49,7 +49,7 @@ Complete!
 [root@httpd0 ~]#
 ```
 
-### ホストとコンテナ間でディレクトリを共有する
+## ホストとコンテナ間でディレクトリを共有する
 ホストと共有するディレクトリはコンテナ側から見るとデバイスとして追加される。
 利用するコマンドは "lxc config device add"　で、以下のような形式をとる。
 ```
@@ -74,3 +74,35 @@ $ lxc launch images:centos/7
 
 ```
 
+- - -
+はまったところ
+## 1. ホスト側で nfs マウントしたディレクトリはコンテナ側に disk デバイスとして追加できない？
+lxc config device add するとエラーが出る。
+```
+$ sudo mount -t nfs nfsserver:/mnt/path /mnt
+$ lxc launch images:centos/7 nfsc0
+Creating nfsc0
+Starting nfsc0
+$ lxc config device add nfsc0 httprt disk source=/mnt path=/mnt
+Error: Add disk devices: Failed to add mount for device: Failed to run: /snap/lxd/current/bin/lxd forkmount lxc-mount nfsc0 /var/snap/lxd/common/lxd/containers /var/snap/lxd/common/lxd/logs/nfsc0/lxc.conf /var/snap/lxd/common/lxd/devices/nfsc0/disk.httprt.mnt /mnt none 4096:                                       
+$ lxc config device add nfsc0 httprt disk source=/mnt/nfsshare/ path=/mnt
+Error: Add disk devices: Failed to setup device: remove /var/snap/lxd/common/lxd/devices/nfsc0/disk.httprt.mnt: device or resource busy 
+$
+```
+なお、一度この状態になるとコンテナを削除して**同じコンテナ名で**作り直してもエラーが取れない。
+```
+$ lxc launch images:centos/7 nfsc0
+Creating nfsc0
+Starting nfsc0
+Error: Failed to run: /snap/lxd/current/bin/lxd forkstart nfsc0 /var/snap/lxd/common/lxd/containers /var/snap/lxd/common/lxd/logs/nfsc0/lxc.conf:
+Try `lxc info --show-log local:nfsc0` for more info
+$ lxc info --show-log local:nfsc0
+...
+lxc nfsc0 20190626134458.413 ERROR    utils - utils.c:safe_mount:1187 - Invalid argument - Failed to mount "/var/snap/lxd/common/lxd/shmounts/nfsc0" onto "/$ar/snap/lxd/common/lxc//dev/.lxd-mounts"
+lxc nfsc0 20190626134458.414 ERROR    conf - conf.c:mount_entry:2044 - Invalid argument - Failed to mount "/var/snap/lxd/common/lxd/shmounts/nfsc0" on "/var$snap/lxd/common/lxc//dev/.lxd-mounts"
+...
+```
+この状態から回復させるにはホスト側の lxd.daemon.service を再起動する必要がある
+```
+$ sudo systemctl restart snap.lxd.daemon
+```
