@@ -16,8 +16,8 @@
    - コメント : 任意
    - IP アドレス : 任意
 1. イニシエーターを追加する
-   - Target Global Configuration のベースネームをイニシエータに指定する
-   - これ以外はデフォルト値
+   - 接続元（クライアント）のアドレス/ネットワークアドレスを設定する
+   - 特に制限なしなら ALL/ALL
 1. ターゲット
    - ポータルグループID, イニシエータグループIDはこの前の手順で作ったものを指定する
 1. エクステンド
@@ -30,10 +30,15 @@
 ## Fedora 30 から接続する
 iscsi-initiator-utils を入れる（初めから入ってるかも？）
 ```
-sudo dnf install -y iscsi-initiator-utils
+% sudo dnf install -y iscsi-initiator-utils
 ```
 
 scsi target を探す
 ```
- iscsiadm -m discovery -t sendtargets -p 192.168.122.2
+ #  iscsiadm -m discovery -t sendtargets -p 192.168.122.2
+192.168.122.2:3260,1 iqn.2005-10.org.freenas.ctl:isd0
 ```
+このコマンドの出力内容:
+- 192.168.122.2:3260 は NAS サーバの IP アドレス/ポート番号
+- iqn.2005-10.org.freenas.ctl は Target GlobalConfiguration に指定したFQDN
+- isd0 はターゲットに指定した値
