@@ -1,6 +1,6 @@
 # Fedora 30 で iSCSI ディスクに接続する
 
-1. 対抗は FreeNAS11
+1. 対向は FreeNAS11
    - FreeNAS 上に iSCSI を構成する方法は適当に探せば出てくる
 
 ## FreeNAS の設定
