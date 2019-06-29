@@ -34,7 +34,7 @@ $ lxc launch images:centos/7 httpd0
 Creating httpd0
 Starting httpd0 
 $ lxc exec httpd0 bash
-[root@httpd0 ~]# cat > /etc/yum.repo.d/nginx.repo << _EOF
+[root@httpd0 ~]# cat > /etc/yum.repos.d/nginx.repo << _EOF
 [nginx]
 name=nginx repo
 baseurl=http://nginx.org/packages/mainline/centos/7/\$basearch/
