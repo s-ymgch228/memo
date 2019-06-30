@@ -18,8 +18,7 @@ Error: Failed to run: /snap/lxd/current/bin/lxd forkstart gitsrv0 /var/snap/lxd/
 Try `lxc info --show-log gitsrv0` for more info
 ```
 
-おそらく↓のバグ
-https://github.com/lxc/lxd/issues/5788
+おそらく https://github.com/lxc/lxd/issues/5788 のバグ
 
 #### lxc config device add するとエラーが出る。
 ```
