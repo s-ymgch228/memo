@@ -62,3 +62,17 @@ $ lxc config device add rproxy0 http proxy listen=tcp:0.0.0.0:80 connect=tcp:127
 Device http added to rproxy0
 ```
 ホスト側の firewall や selinux の設定によっては転送するように設定していても discard されていることもある
+
+## NIC 追加
+物理ネットワークに接続したいときは nic を追加する。
+
+```
+lxc config device add flashair0 phy-nic nic nictype=macvlan parent=enp3s0
+```
+flashair0 はコンテナ名、その次の phy-nic は適当につけたデバイス名
+
+nictype はいくつかあるうちの macvlan を選んだ。
+macvlan は物理NICからパケットを送受信する場合にブリッジより効率がいい（らしい）。
+
+macvlan に似たやつに ipvlan があるがこっちは物理 NIC の MAC アドレスを使いまわす。そのため dhcp とは相性が悪そう。
+その一方で MAC アドレスの総数が増えないので L2SW 的には負荷が少なそう
