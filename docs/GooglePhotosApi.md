@@ -28,3 +28,13 @@ Redirect URI は `urn:ietf:wg:oauth:2.0:oob` 固定。
 Redirect URIは、認証後に遷移させる Web Application のアドレスで、
 Application Type に Web Application を指定するときに同時に設定する。
 このアドレスは事前に設定したものと完全一致しないといけない。
+
+SCOPE は [Authetication-authorization](https://developers.google.com/photos/library/guides/authentication-authorization) あたりを見る。
+
+例えば今なら、 write は
+```
+https://www.googleapis.com/auth/photoslibrary.appendonly
+```
+共有する API は別(`https://www.googleapis.com/auth/photoslibrary.sharing`)にあって、同時に writeと share を指定したい場合の SCOPE は
+この2つを ' '(スペース)をエンコードした "%20" で連結する。
+
