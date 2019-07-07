@@ -38,3 +38,6 @@ https://www.googleapis.com/auth/photoslibrary.appendonly
 共有する API は別(`https://www.googleapis.com/auth/photoslibrary.sharing`)にあって、同時に writeと share を指定したい場合の SCOPE は
 この2つを ' '(スペース)をエンコードした "%20" で連結する。
 
+Reference
+- - -
+- https://developers.google.com/adwords/api/docs/guides/authentication?hl=ja
