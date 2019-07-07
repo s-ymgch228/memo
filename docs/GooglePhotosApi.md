@@ -20,5 +20,12 @@ OAuth2 は 「Client ID」、「SECRET」、「Redirect URI」、「SCOPE」が�
 
 Client id と SECRET は API 有効次に Application Type を Other にした段階で手に入る。
 
-Redirect URI は `urn:ietf:wg:oauth:2.0:oob` 固定。ここは Web Application の場合は変わるらしい？
-この辺りは OAuth 2.0 のフローを見ればわかるかもしれない。
+Redirect URI は `urn:ietf:wg:oauth:2.0:oob` 固定。
+
+>　urn:ietf:wg:oauth:2.0:oob
+
+> この値は、Google の承認サーバーが承認コードをブラウザのタイトル バーに返すことを指定します。
+
+Redirect URIは、認証後に遷移させる Web Application のアドレスで、
+Application Type に Web Application を指定するときに同時に設定する。
+このアドレスは事前に設定したものと完全一致しないといけない。
