@@ -1,3 +1,14 @@
+# Google Photos library APIs を使って写真をアップロードする
+
+手順
+1. GoogleAPIs のうち、Google Photos APIs を有効にする
+   - ここで client_id, client_secret が手に入る
+1. Autorization Code を手に入れる
+   - `https://accounts.google.com/o/oauth2/v2/auth` にパラメタをつなげて**ブラウザから**アクセスする
+   - 使うパラメタは client_id, scope, redirect_uri
+      - scope, redirect_uri は固定値
+1. Access Code を入手する
+
 ## GoogleAPIs を有効にする
 [Get started with RESET](https://developers.google.com/photos/library/guides/get-started?refresh=1)
 
@@ -37,9 +48,22 @@ https://www.googleapis.com/auth/photoslibrary.appendonly
 共有する API は別(`https://www.googleapis.com/auth/photoslibrary.sharing`)にあって、同時に writeと share を指定したい場合の SCOPE は
 この2つを ' '(スペース)をエンコードした "%20" で連結する。
 
+あとはこれを `https://accounts.google.com/o/oauth2/v2/auth` に投げつける。
+このリンクの出自は不明
+```
+URL="https://accounts.google.com/o/oauth2/v2/auth"
+clientid=" ... " # 入手しているやつを埋める
+ruri="urn:ietf:wg:oauth:2.0:oob"
+scope="https://www.googleapis.com/auth/photoslibrary.appendonly"
 
+echo ${URL}?response_type=code&client_id=${clientid}&redirect_uri=${ruri}&scope=${scope}&access_type=offline
+```
+ここで表示される URL をブラウザにコピペする。リンクを開くと google の画面が出てくるのでログインして最後まで進める。
+
+おそらく最後まで行くと ACCESS TOKEN が手に入るはず
 
 Reference
 - - -
+- https://developers.google.com/search/apis/indexing-api/v3/get-token?hl=ja
 - https://qiita.com/zaki-lknr/items/97c363c12ede4c1f25d2
 - https://developers.google.com/adwords/api/docs/guides/authentication?hl=ja
