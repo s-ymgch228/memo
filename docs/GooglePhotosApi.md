@@ -16,18 +16,17 @@ GCP はプロジェクト単位で管理しているため Google Photos APIs �
 
 ## Access Token を手に入れる
 スクリプトから API をたたくには、OAuth 2.0 を完了させて Access Token を手に入れる必要がある
-OAuth2 は 「Client ID」、「SECRET」、「Redirect URI」、「SCOPE」が必要。
+OAuth2 で Access Token を手に入れるには 「Client ID」、「SECRET」、「Redirect URI」、「SCOPE」が必要。
 
-Client id と SECRET は API 有効次に Application Type を Other にした段階で手に入る。
+Client id と SECRET は API 有効時に Application Type を Other にした段階で手に入る。
 
 Redirect URI は `urn:ietf:wg:oauth:2.0:oob` 固定。
 
 > urn:ietf:wg:oauth:2.0:oob  
 > この値は、Google の承認サーバーが承認コードをブラウザのタイトル バーに返すことを指定します。
 
-Redirect URIは、認証後に遷移させる Web Application のアドレスで、
-Application Type に Web Application を指定するときに同時に設定する。
-このアドレスは事前に設定したものと完全一致しないといけない。
+ちなみに、Redirect URI は認証後に遷移するページで、Web Application にした場合にユーザ自身が指定する。
+指定した値と、Redirect URI の値は完全一致する必要がある。
 
 SCOPE は [Authetication-authorization](https://developers.google.com/photos/library/guides/authentication-authorization) あたりを見る。
 
@@ -38,6 +37,9 @@ https://www.googleapis.com/auth/photoslibrary.appendonly
 共有する API は別(`https://www.googleapis.com/auth/photoslibrary.sharing`)にあって、同時に writeと share を指定したい場合の SCOPE は
 この2つを ' '(スペース)をエンコードした "%20" で連結する。
 
+
+
 Reference
 - - -
+- https://qiita.com/zaki-lknr/items/97c363c12ede4c1f25d2
 - https://developers.google.com/adwords/api/docs/guides/authentication?hl=ja
