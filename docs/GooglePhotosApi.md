@@ -1,69 +1,49 @@
 # Google Photos library APIs を使って写真をアップロードする
 
-手順
-1. GoogleAPIs のうち、Google Photos APIs を有効にする
-   - ここで client_id, client_secret が手に入る
-1. Autorization Code を手に入れる
-   - `https://accounts.google.com/o/oauth2/v2/auth` にパラメタをつなげて**ブラウザから**アクセスする
-   - 使うパラメタは client_id, scope, redirect_uri
-      - scope, redirect_uri は固定値
-1. Access Code を入手する
+## OAuth2 の Access Token を入手する
+やり方は [Google API OAuth2.0のトークン取得手順](https://qiita.com/giiko_/items/b0b2ff41dfb0a62d628b) にある通り。
 
-## GoogleAPIs を有効にする
-[Get started with RESET](https://developers.google.com/photos/library/guides/get-started?refresh=1)
+### client id　/ client secret を作る
+[Get start with REST](https://developers.google.com/photos/library/guides/get-started) の "enable API" を行って
+「client id」と「client secret」 をつくる。この値は管理画面から見れるので特に保存する必要はない。
+shell script で動かす場合でも Application type は Web Applicaton としておく。redirect url は `http://localhost` にする
 
-Google APIs は Google Could Platform (GCP)の一部分という扱い(らしい)
-GCP はプロジェクト単位で管理しているため Google Photos APIs を使うためには以下の手順が必要
+### scope を決める
+scope は URL の形をしていて
+[Authentication & authorization](https://developers.google.com/photos/library/guides/authentication-authorization) 
+にあるリストから用途に合ったものを選択する。
 
-1. Project を作る
-1. プロジェクトの設定で Google APIs を有効にする
+複数の scope を使いたい場合は "%20" で `SCOPE_0%02%SCOPE_1%20...` のようにつなげる。
 
-ただこれは、Get started の 「ENABLE THE GOOGLE PHOTOS LIBRARY API」を
-進めば自動的に設定されるはずなのであまり気にすることはない。
+### authorization code を手に入れる
+**web ブラウザ**を使って `https://accounts.google.com/o/oauth2/auth`へアクセスする
+リンクはパラメタをつなげて以下のようにする。
 
-適当なスクリプトから呼び出す場合。Application Type は Other にする。
-
-これで 「Client ID(?)」 と「SECRET」 が手に入る
-
-## Access Token を手に入れる
-スクリプトから API をたたくには、OAuth 2.0 を完了させて Access Token を手に入れる必要がある
-OAuth2 で Access Token を手に入れるには 「Client ID」、「SECRET」、「Redirect URI」、「SCOPE」が必要。
-
-Client id と SECRET は API 有効時に Application Type を Other にした段階で手に入る。
-
-Redirect URI は `urn:ietf:wg:oauth:2.0:oob` 固定。
-
-> urn:ietf:wg:oauth:2.0:oob  
-> この値は、Google の承認サーバーが承認コードをブラウザのタイトル バーに返すことを指定します。
-
-ちなみに、Redirect URI は認証後に遷移するページで、Web Application にした場合にユーザ自身が指定する。
-指定した値と、Redirect URI の値は完全一致する必要がある。
-
-SCOPE は [Authetication-authorization](https://developers.google.com/photos/library/guides/authentication-authorization) あたりを見る。
-
-例えば今なら、 write は
 ```
-https://www.googleapis.com/auth/photoslibrary.appendonly
-```
-共有する API は別(`https://www.googleapis.com/auth/photoslibrary.sharing`)にあって、同時に writeと share を指定したい場合の SCOPE は
-この2つを ' '(スペース)をエンコードした "%20" で連結する。
+baseurl="https://accounts.google.com/o/oauth2/auth"
+client_id="hidden"
+client_secret="hidden"
+redirect_uri="http://localhost"
+scope="https://www.googleapis.com/auth/photoslibrary"
 
-あとはこれを `https://accounts.google.com/o/oauth2/v2/auth` に投げつける。
-このリンクの出自は不明
+cat << _EOF
+${baseurl}\
+?client_id=${client_id}\
+&redirect_uri=${redirect_uri}\
+&scope=${scope}\
+&response_type=code\
+&approval_prompt=force\
+&access_type=offline
+_EOF
 ```
-URL="https://accounts.google.com/o/oauth2/v2/auth"
-clientid=" ... " # 入手しているやつを埋める
-ruri="urn:ietf:wg:oauth:2.0:oob"
-scope="https://www.googleapis.com/auth/photoslibrary.appendonly"
-
-echo ${URL}?response_type=code&client_id=${clientid}&redirect_uri=${ruri}&scope=${scope}&access_type=offline
-```
-ここで表示される URL をブラウザにコピペする。リンクを開くと google の画面が出てくるのでログインして最後まで進める。
-
-おそらく最後まで行くと ACCESS TOKEN が手に入るはず
+このリンクを踏むと、Google の認証ページに飛ばされる。
+「途中認証されていないアプリ」みたいな警告が出てくるが、危険を理解して... 的なところから認証を進める。
+認証が完了したら、接続できないページが出てくる。
+このページのリンクの `code=` がauthorization code
 
 Reference
 - - -
-- https://developers.google.com/search/apis/indexing-api/v3/get-token?hl=ja
-- https://qiita.com/zaki-lknr/items/97c363c12ede4c1f25d2
-- https://developers.google.com/adwords/api/docs/guides/authentication?hl=ja
+1. [Google API OAuth2.0のトークン取得手順](https://qiita.com/giiko_/items/b0b2ff41dfb0a62d628b)
+   - これが一番役に立った。
+1. [Google OAuth2 Tutorial](https://requests-oauthlib.readthedocs.io/en/latest/examples/google.html)
+1. [Google API OAuth2](https://qiita.com/giiko_/items/b0b2ff41dfb0a62d628b)
