@@ -86,15 +86,17 @@ REFRESH_TOKEN = "hidden"
 CLIENT_ID = "hidden"
 CLIENT_SECRET = "hidden"
 
-uri=URI.parse('https://www.googleapis.com/oauth2/v4/token')
-query = {
-  "refresh_token" => REFRESH_TOKEN,
-  "client_id"     => CLIENT_ID,
-  "client_secret" => CLIENT_SECRET,
-  "grant_type"    => "refresh_token"
-}
+
 
 begin
+  uri=URI.parse('https://www.googleapis.com/oauth2/v4/token')
+  query = {
+    "refresh_token" => REFRESH_TOKEN,
+    "client_id"     => CLIENT_ID,
+    "client_secret" => CLIENT_SECRET,
+    "grant_type"    => "refresh_token"
+  }
+
   res = Net::HTTP.post_form(uri, query)
   token = JSON.parse(res.body) if res.code == "200"
 rescue => e
