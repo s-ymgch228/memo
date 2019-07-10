@@ -96,7 +96,7 @@ begin
   }
 
   res = Net::HTTP.post_form(uri, query)
-  token = JSON.parse(res.body) if res.code == "200"
+  token = JSON.parse(res.body) if res.ode == "200"
 rescue => e
   puts "#{e}"
 end
@@ -104,6 +104,27 @@ end
 exit 1 if token.nil?
 
 puts "token=#{token}" if $debug
+```
+
+あとは Access Token を使って API をたたく。
+例えば上記のコードに以下のコードをつなげる
+```
+uri = URI.parse("https://photoslibrary.googleapis.com/v1/mediaItems:search")
+
+req = Net::HTTP::Post.new(uri.path)
+req["Authorization"] = "Bearer #{token["access_token"]}"
+req["Context-type"] = "application/json"
+req.set_form_data({"pageSize" => "5"})
+
+http = Net::HTTP.new(uri.host, uri.port)
+http.use_ssl = true
+res = http.start { | h | http.request(req) }
+
+if $debug
+  puts "code=#{res.code}"
+  puts "body=\"#{res.body}\""
+end
+
 ```
 
 Reference
