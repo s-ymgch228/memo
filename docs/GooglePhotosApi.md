@@ -83,10 +83,8 @@ require 'json'
 $debug=true
 
 REFRESH_TOKEN = "hidden"
-CLIENT_ID = "hidden"
+CLIENT_ID     = "hidden"
 CLIENT_SECRET = "hidden"
-
-
 
 begin
   uri=URI.parse('https://www.googleapis.com/oauth2/v4/token')
