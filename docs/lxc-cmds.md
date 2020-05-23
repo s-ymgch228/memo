@@ -76,3 +76,17 @@ macvlan は物理NICからパケットを送受信する場合にブリッジよ
 
 macvlan に似たやつに ipvlan があるがこっちは物理 NIC の MAC アドレスを使いまわす。そのため dhcp とは相性が悪そう。
 その一方で MAC アドレスの総数が増えないので L2SW 的には負荷が少なそう
+
+### ネットワーク音追加
+<lxdbrN> は作りたい名前に置き換える
+```
+lxc network create <lxdbrN> bridge.external_interfaces=enp3s0 ipv4.nat=true
+```
+
+パラメタ
+- bridge.external_interfaces=enp3s0
+   - 外部のNIC
+- ipv4.nat
+   - NATするかどうか
+
+bridge.external_interfaces するときは lxd 専用の NIC が必要らしい(?)
