@@ -67,18 +67,21 @@ Device http added to rproxy0
 物理ネットワークに接続したいときは nic を追加する。
 
 ```
-lxc config device add flashair0 phy-nic nic nictype=macvlan parent=enp3s0
+lxc config device add flashair0 phy-nic nic nictype=bridged parent=br0
 ```
 flashair0 はコンテナ名、その次の phy-nic は適当につけたデバイス名
 
-nictype はいくつかあるうちの macvlan を選んだ。
-macvlan は物理NICからパケットを送受信する場合にブリッジより効率がいい（らしい）。
+~~nictype はいくつかあるうちの macvlan を選んだ
+macvlan は物理NICからパケットを送受信する場合にブリッジより効率がいい（らしい）。~~
+
+あらかじめホスト側に Bridge インタフェースを nmcli などで作るようにしておいて nictype は bridged にする。
+macvlan を選ぶと container 側の nic も macvlan になり、NetworkManager がエラーをはいて dhcp client が自動起動しないことがある。
 
 macvlan に似たやつに ipvlan があるがこっちは物理 NIC の MAC アドレスを使いまわす。そのため dhcp とは相性が悪そう。
 その一方で MAC アドレスの総数が増えないので L2SW 的には負荷が少なそう
 
-### ネットワーク音追加
-<lxdbrN> は作りたい名前に置き換える
+### ネットワークの追加
+`<lxdbrN>` は作りたい名前に置き換える
 ```
 lxc network create <lxdbrN> bridge.external_interfaces=enp3s0 ipv4.nat=true
 ```
