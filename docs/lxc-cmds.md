@@ -93,3 +93,12 @@ lxc network create <lxdbrN> bridge.external_interfaces=enp3s0 ipv4.nat=true
    - NATするかどうか
 
 bridge.external_interfaces するときは lxd 専用の NIC が必要らしい(?)
+
+### 固定 IP
+```
+$ lxc network attach lxdbr0 <コンテナ名> eth0 eth0
+$ lxc config device set <コンテナ名> eth0 ipv4.address <IPアドレス>
+$ lxc restart <コンテナ名>
+```
+network attach はすでに eth0 がある場合でも必要。
+この後にコンテナ側で `/etc/sysconfig/network-config/ifcfg-eth0` などを編集して固定する。
