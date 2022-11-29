@@ -1,194 +1,159 @@
-# Fedora 30 上で LXD を使ってみた時のメモ
-lxd/lxc を Fedora 30 上で実行して shell が触れるようにする
+# LXD セットアップ + 使い方
 
-## install
-### 0. snapd をインストールする
+## 
+ - LXC でホストとコンテナ、コンテナと外部を同じネットワークで繋げるようにする
+ - 使う OS はFedora release 36
+
+## 前準備
+![ネットワーク構成](../images/lxd-nic.png)
+
+コンテナとホストの接続はブリッジを使うと楽なので適当なブリッジインタフェースを用意する。
+STPはデフォルト有効なので不要なら切っておく。不要なトラブルを避ける意味で物理インタフェースの設定前に切っておくといい。
+
+```
+nmcli con add type bridge ifname br0
+nmcli con mod bridge-br0 connection.id br0
+nmcli con mod br0 bridge.stp no
+nmcli con add type bridge-slave ifname enp2s0f1 master br0
+```
+
+## インストール
 LXD は Ubuntu 系が主に開発しているため yum/dnf でサクッとインストールできない。
-そこで、ディストリビューションに依存しないでインストールできる仕組みの snapd を使う。
-
-snapd は dnf を使ってインストールする。
+なので、ディストリビューションに依存しないでインストールできる仕組みの snapd を入れる。
 ```
-% sudo dnf -y install snapd
-% sudo systemctl start snapd.seeded.service
+dnf -y install snapd
+systemctl start snapd.seeded.service
 ```
-snapd を入れた後は snapd.seeded を起動して初期化っぽいことをする。
-snapd.seeded は実行完了するとそのまま exit される。
-
-### 1. LXD をインストールする
-snapd を使って lxd 本体を入れる。
+そのあと snapd 経由で lxd を入れる。(バージョン指定する時は `--channel=3.0/stable` を lxd の後につける)
 ```
 snap install lxd
 ```
-バージョン指定するには `--channel=3.0/stable` を lxd の後につける
 
-lxd は lxd グループに属するアカウントにローカル接続を許可するので通常使うユーザのアカウントを lxd グループに加える
-```
-sudo gpasswd -a <username> lxd
-```
-### 2. LXDを初期化する
-lxd は使う前に初期化する必要がある。
-初期化は `lxd init` コマンドを使う。
-```
-% lxd init
-Would you like to use LXD clustering? (yes/no) [default=no]: no
-Do you want to configure a new storage pool? (yes/no) [default=yes]: yes
-Name of the new storage pool [default=default]: default
-Name of the storage backend to use (dir, lvm, zfs) [default=zfs]: dir        <===== dir にする
-Would you like to connect to a MAAS server? (yes/no) [default=no]: no
-Would you like to create a new network bridge? (yes/no) [default=yes]: yes
-What should the new bridge be called? [default=lxdbr0]: lxdbr0
-What IPv4 address should be used? (CIDR subnet notation, “auto” or “none”)
-[default=auto]: auto
-What IPv6 address should be used? (CIDR subnet notation, “auto” or “none”)
-[default=auto]: none
-Would you like LXD to be available over the network? (yes/no)
-[default=no]: no　　　　　　　　　　　　　　　　　　　　<===== コンテナが直接ネットワークに接続するかどうか？
-Would you like stale cached images to be updated automatically? (yes/no)
-[default=yes] yes
-Would you like a YAML "lxd init" preseed to be printed? (yes/no)
-[default=no]: no
-%
-```
-
-### 3 Linux カーネル起動時のパラメタに namespace を有効化する値を追加する
-namespace はカーネルの機能を lxc ごとに分割できるように名前を付けるような機能(多分)。これは起動時のパラメタで設定する。
-(そもそもこの設定が必要かどうかはわからない)
-```
-% sudo vi /etc/default/grub
-...
-GRUB_CMDLINE_LINUX="resume=/dev/mapper/fedora-swap rd.lvm.lv=fedora/root rd.lvm.lv=fedora/swap rhgb quiet user_namespace.enable=1 namespace.unpriv_enable=1"
-...
-```
-`/etc/default/grub` の中に書かれている GRUB_CMDLINE_LINIUX に `user_namespace.enable=1` と `namespace.unpriv_enable=1` を追加する。
-追加が終わったら grub の設定ファイルに反映する
+## 初期化
+lxd の初期設定。今回はあらかじめ作ったブリッジを利用するのでその周りの設定を入れる。
+その他なんとなく入れている設定も残しておく。
+1. "Name of the storage backend to use ~"
+   - コンテナのストレージのタイプ。なるべくホスト側が利用している機能と別のやつを使っておいた方がいい。
+      - ホストで lvm を使っていれば lxd のバックエンドは btrfs にする等
+      - (lvm をホストとコンテナの両方で使っていてハングした時にホストごと動かなくなることがあった)
+2.  Name of the new storage pool~
+   - デフォルトでも構わないがあとでストレージプールを足すこともあるので適当な名前をつけておく
+3. "Would you like to create a new network bridge?"
+   - あらかじめ作ったブリッジを使うので "no" を指定する
+   - "Name of the existing bridge or host interface" で作ったブリッジを指定する
+4. "Would you like the LXD server to be available over the network?"
+   - なんとなく no にしているけどコンテナのマイグレーションとか使う時に必要かも？
 
 ```
-% sudo grub2-mkconfig -o /boot/efi/EFI/fedora/grub.cfg
-```
-`/boot/efi/...` は UEFI boot の場合に読み込まれるフォルダ。 BIOS 起動の場合はパスが違う。
-update した後は reboot して反映する。
-
-## 使い方
-### コンテナのイメージを決める
-`lxc image list images:` コマンドで公開されているコンテナのイメージ一覧が見れる。
-はじめはこのリストから作るコンテナのイメージを決める。
-
-
-```
- $ lxc image list images: 
-+--------------------------------------+--------------+--------+----------------------------------------------+---------+-----------+-------------------------------+
-|                ALIAS                 | FINGERPRINT  | PUBLIC |                 DESCRIPTION                  |  ARCH   |   SIZE    |          UPLOAD DATE          |
-+--------------------------------------+--------------+--------+----------------------------------------------+---------+-----------+-------------------------------+
-| alpine/3.6 (3 more)                  | 41854f8f76db | yes    | Alpine 3.6 amd64 (20190619_13:00)            | x86_64  | 3.17MB    | Jun 19, 2019 at 12:00am (UTC) |
-+--------------------------------------+--------------+--------+----------------------------------------------+---------+-----------+-------------------------------+
-| alpine/3.6/arm64 (1 more)            | 9d8005cbf484 | yes    | Alpine 3.6 arm64 (20190619_13:00)            | aarch64 | 3.07MB    | Jun 19, 2019 at 12:00am (UTC) |
-+--------------------------------------+--------------+--------+----------------------------------------------+---------+-----------+-------------------------------+
-| alpine/3.6/armhf (1 more)            | d4106eea0acf | yes    | Alpine 3.6 armhf (20190619_13:00)            | armv7l  | 3.11MB    | Jun 19, 2019 at 12:00am (UTC) |
-+--------------------------------------+--------------+--------+----------------------------------------------+---------+-----------+-------------------------------+
-| alpine/3.6/i386 (1 more)             | 52794d2fdb36 | yes    | Alpine 3.6 i386 (20190619_13:00)             | i686    | 3.22MB    | Jun 19, 2019 at 12:00am (UTC) |
-+--------------------------------------+--------------+--------+----------------------------------------------+---------+-----------+-------------------------------+
-| alpine/3.7 (3 more)                  | 02cd8e69cfe8 | yes    | Alpine 3.7 amd64 (20190619_13:00)            | x86_64  | 3.37MB    | Jun 19, 2019 at 12:00am (UTC) |
-+--------------------------------------+--------------+--------+----------------------------------------------+---------+-----------+-------------------------------+
-| alpine/3.7/arm64 (1 more)            | 8cd64606e3ea | yes    | Alpine 3.7 arm64 (20190619_13:00)            | aarch64 | 3.25MB    | Jun 19, 2019 at 12:00am (UTC) |
-+--------------------------------------+--------------+--------+----------------------------------------------+---------+-----------+-------------------------------+
-| alpine/3.7/armhf (1 more)            | 2dd20d3f1bac | yes    | Alpine 3.7 armhf (20190619_13:00)            | armv7l  | 3.28MB    | Jun 19, 2019 at 12:00am (UTC) |
-+--------------------------------------+--------------+--------+----------------------------------------------+---------+-----------+-------------------------------+
-| alpine/3.7/i386 (1 more)             | dd412e1980d2 | yes    | Alpine 3.7 i386 (20190619_13:00)             | i686    | 3.43MB    | Jun 19, 2019 at 12:00am (UTC) |
-+--------------------------------------+--------------+--------+----------------------------------------------+---------+-----------+-------------------------------+
-| alpine/3.8 (3 more)                  | 7d7dd381bf08 | yes    | Alpine 3.8 amd64 (20190619_13:00)            | x86_64  | 2.34MB    | Jun 19, 2019 at 12:00am (UTC) |
-...
-```
-この一覧は特定のディストリビューションだけフィルタすることもできる。
-
-例えば、CentOS のイメージだけが見たければ `lxc image list imgases:centos` のようにする
-
-```
-$ lxc image list images:centos
-+---------------------------+--------------+--------+-----------------------------------+---------+----------+-------------------------------+
-|           ALIAS           | FINGERPRINT  | PUBLIC |            DESCRIPTION            |  ARCH   |   SIZE   |          UPLOAD DATE          |
-+---------------------------+--------------+--------+-----------------------------------+---------+----------+-------------------------------+
-| centos/6 (3 more)         | 52e5cfb4eea3 | yes    | Centos 6 amd64 (20190619_07:08)   | x86_64  | 109.74MB | Jun 19, 2019 at 12:00am (UTC) |
-+---------------------------+--------------+--------+-----------------------------------+---------+----------+-------------------------------+
-| centos/6/i386 (1 more)    | 3a888cfceae7 | yes    | Centos 6 i386 (20190619_07:08)    | i686    | 109.98MB | Jun 19, 2019 at 12:00am (UTC) |
-+---------------------------+--------------+--------+-----------------------------------+---------+----------+-------------------------------+
-| centos/7 (3 more)         | 763f3826ffd0 | yes    | Centos 7 amd64 (20190619_07:08)   | x86_64  | 124.90MB | Jun 19, 2019 at 12:00am (UTC) |
-+---------------------------+--------------+--------+-----------------------------------+---------+----------+-------------------------------+
-| centos/7/arm64 (1 more)   | 6c98f48057fa | yes    | Centos 7 arm64 (20190619_07:08)   | aarch64 | 125.16MB | Jun 19, 2019 at 12:00am (UTC) |
-+---------------------------+--------------+--------+-----------------------------------+---------+----------+-------------------------------+
-| centos/7/armhf (1 more)   | 927ea26a486b | yes    | Centos 7 armhf (20190619_07:08)   | armv7l  | 122.52MB | Jun 19, 2019 at 12:00am (UTC) |
-+---------------------------+--------------+--------+-----------------------------------+---------+----------+-------------------------------+
-| centos/7/i386 (1 more)    | 5e3043b4ce2f | yes    | Centos 7 i386 (20190619_07:08)    | i686    | 125.32MB | Jun 19, 2019 at 12:00am (UTC) |
-+---------------------------+--------------+--------+-----------------------------------+---------+----------+-------------------------------+
-| centos/7/ppc64el (1 more) | 0f24e5285659 | yes    | Centos 7 ppc64el (20190619_07:08) | ppc64le | 126.76MB | Jun 19, 2019 at 12:00am (UTC) |
-+---------------------------+--------------+--------+-----------------------------------+---------+----------+-------------------------------+
-$
+# lxd init
+Would you like to use LXD clustering? (yes/no) [default=no]: 
+Do you want to configure a new storage pool? (yes/no) [default=yes]: 
+Name of the new storage pool [default=default]: strg0
+Name of the storage backend to use (ceph, cephobject, dir, lvm, btrfs) [default=btrfs]: 
+Would you like to create a new btrfs subvolume under /var/snap/lxd/common/lxd? (yes/no) [default=yes]: 
+Would you like to connect to a MAAS server? (yes/no) [default=no]: 
+Would you like to create a new local network bridge? (yes/no) [default=yes]: no
+Would you like to configure LXD to use an existing bridge or host interface? (yes/no) [default=no]: yes
+Name of the existing bridge or host interface: br0
+Would you like the LXD server to be available over the network? (yes/no) [default=no]: no
+Would you like stale cached images to be updated automatically? (yes/no) [default=yes]:    
+Would you like a YAML "lxd init" preseed to be printed? (yes/no) [default=no]: 
+# 
 ```
 
-### コンテナを作る
-起動するイメージが決まったら、ALIAS のところに書かれている名前を使ってコンテナを作る。
-
-コマンドは `lxc launch <イメージ名> <コンテナ名>`。
-例えば CentOS7 を作るときは `lxc launch images:centos/7 \<コンテナ名>` のように指定する。
-ここではコンテナの名前は `cent7-0` とする。
-
+LXD は利用できるユーザを lxd グループに入れておく必要がある。
+また、グループを変更した後は lxd の関連プロセスを再起動して反映しないといけない。
+(systemctl restart ... は不十分かも？うまく反映されずに再起動した)
 ```
-$ lxc launch images:centos/7 cent7-0
-Creating cent7-0
-Starting cent7-0
-$
-```
-コンテナのイメージはインターネットに公開されているものを取得するため、そこそこ時間がかかる。
-"Starting ..." が出ればコンテナは実行されている状態になる。
-
-### コンテナ上でコマンドを実行する
-起動したコンテナ上でコマンドを実行するには "lxc exec" コマンドを使う。
-exec は `lxc exec \<コンテナ名> \<コマンド> [オプション...]` のように使う。
-
-例えば、 "ip address show" コマンドを作ったコンテナy像で実行するには以下のようにする。
-```
-$ lxc exec cent7-0 ip a s
-1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
-    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
-    inet 127.0.0.1/8 scope host lo
-       valid_lft forever preferred_lft forever
-    inet6 ::1/128 scope host
-       valid_lft forever preferred_lft forever
-8: eth0@if9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
-    link/ether 00:16:3e:11:1a:80 brd ff:ff:ff:ff:ff:ff link-netnsid 0
-    inet 10.100.111.226/24 brd 10.100.111.255 scope global dynamic eth0
-       valid_lft 3420sec preferred_lft 3420sec
-    inet6 fd42:b5e9:3e26:b888:216:3eff:fe11:1a80/64 scope global mngtmpaddr dynamic
-       valid_lft 3488sec preferred_lft 3488sec
-    inet6 fe80::216:3eff:fe11:1a80/64 scope link
-       valid_lft forever preferred_lft forever
-$
+# gpasswd -a <user id> lxd
+# systemctl restart snap.lxd.daemon snap.lxd.daemon.unix.socket
 ```
 
-実行するコマンドに bash などのシェルを command に指定してもいい。
+# コンテナを作る
+ベースになるイメージを調べる
 ```
-$lxc exec cent7-0 bash
-[root@cent7-0 ~]#
-```
-コマンドを複数実行するときとかはこれが便利。
+$ lxc image list images:
++------------------------------------------+--------------+--------+----------------------------------------------+--------------+-----------------+-----------+-------------------------------+
+|                  ALIAS                   | FINGERPRINT  | PUBLIC |                 DESCRIPTION                  | ARCHITECTURE |      TYPE       |   SIZE    |          UPLOAD DATE          |
++------------------------------------------+--------------+--------+----------------------------------------------+--------------+-----------------+-----------+-------------------------------+
+| almalinux/8 (3 more)                     | f13ed0def2e3 | yes    | Almalinux 8 amd64 (20221209_23:08)           | x86_64       | VIRTUAL-MACHINE | 660.44MB  | Dec 9, 2022 at 12:00am (UTC)  |
++------------------------------------------+--------------+--------+----------------------------------------------+--------------+-----------------+-----------+-------------------------------+
+| almalinux/8 (3 more)                     | fbdb0968bf13 | yes    | Almalinux 8 amd64 (20221209_23:08)           | x86_64       | CONTAINER       | 128.43MB  | Dec 9, 2022 at 12:00am (UTC)  |
++------------------------------------------+--------------+--------+----------------------------------------------+--------------+-----------------+-----------+-------------------------------+
+| almalinux/8/arm64 (1 more)               | 48ae0c8ff872 | yes    | Almalinux 8 arm64 (20221209_23:08)           | aarch64      | CONTAINER       | 124.90MB  | Dec 9, 2022 at 12:00am (UTC)  |
++------------------------------------------+--------------+--------+----------------------------------------------+--------------+-----------------+-----------+-------------------------------+
+| almalinux/8/cloud (1 more)               | a2910add64d0 | yes    | Almalinux 8 amd64 (20221209_23:08)           | x86_64       | VIRTUAL-MACHINE | 679.19MB  | Dec 9, 2022 at 12:00am (UTC)  |
 
-### コンテナを停止する
-実行するプログラムがなくなったときなどは ` lxc stop <コンテナ名>` でコンテナを止めることができる。
-一度止めたコンテナは、保存したファイルなどの情報はそのままにコマンドやプログラムが実行されていない状態になる。
-これは、通常のOSの電源 off をした時と同じような状態。
-```
-$ lxc stop cent7-0
-To start your first container, try: lxc launch ubuntu:18.04
-
-$
 ```
 
-このままだとイメージは残ったままでまた起動すれば再開する。
-## 備忘録
- - `lxc image export <???>` を使えばコンテナからイメージを作ることができる？
-    - そのうち確認する
- - 完全に消したければ `lxc delete <コンテナ名>`　とする。
+images: の後に調べたいキーワードをくっつけることもできる。
+```
+$ lxc image list images:rockylinux/9
++-------------------------------+--------------+--------+---------------------------------------+--------------+-----------------+----------+-------------------------------+
+|             ALIAS             | FINGERPRINT  | PUBLIC |              DESCRIPTION              | ARCHITECTURE |      TYPE       |   SIZE   |          UPLOAD DATE          |
++-------------------------------+--------------+--------+---------------------------------------+--------------+-----------------+----------+-------------------------------+
+| rockylinux/9 (3 more)         | 2d9e249e7705 | yes    | Rockylinux 9 amd64 (20221210_02:06)   | x86_64       | VIRTUAL-MACHINE | 565.82MB | Dec 10, 2022 at 12:00am (UTC) |
++-------------------------------+--------------+--------+---------------------------------------+--------------+-----------------+----------+-------------------------------+
+| rockylinux/9 (3 more)         | cd84d085dd1c | yes    | Rockylinux 9 amd64 (20221210_02:06)   | x86_64       | CONTAINER       | 109.57MB | Dec 10, 2022 at 12:00am (UTC) |
++-------------------------------+--------------+--------+---------------------------------------+--------------+-----------------+----------+-------------------------------+
+| rockylinux/9/arm64 (1 more)   | 7aa53d13efc0 | yes    | Rockylinux 9 arm64 (20221210_02:06)   | aarch64      | CONTAINER       | 105.57MB | Dec 10, 2022 at 12:00am (UTC) |
++-------------------------------+--------------+--------+---------------------------------------+--------------+-----------------+----------+-------------------------------+
+| rockylinux/9/cloud (1 more)   | 12581adbb85b | yes    | Rockylinux 9 amd64 (20221210_02:06)   | x86_64       | CONTAINER       | 125.32MB | Dec 10, 2022 at 12:00am (UTC) |
++-------------------------------+--------------+--------+---------------------------------------+--------------+-----------------+----------+-------------------------------+
+| rockylinux/9/cloud (1 more)   | f6f26ae5f520 | yes    | Rockylinux 9 amd64 (20221210_02:06)   | x86_64       | VIRTUAL-MACHINE | 585.69MB | Dec 10, 2022 at 12:00am (UTC) |
++-------------------------------+--------------+--------+---------------------------------------+--------------+-----------------+----------+-------------------------------+
+| rockylinux/9/cloud/arm64      | 8297fb8ed6cf | yes    | Rockylinux 9 arm64 (20221210_02:06)   | aarch64      | CONTAINER       | 120.88MB | Dec 10, 2022 at 12:00am (UTC) |
++-------------------------------+--------------+--------+---------------------------------------+--------------+-----------------+----------+-------------------------------+
+| rockylinux/9/cloud/ppc64el    | 82e5a3ae89ab | yes    | Rockylinux 9 ppc64el (20221210_02:06) | ppc64le      | CONTAINER       | 127.34MB | Dec 10, 2022 at 12:00am (UTC) |
++-------------------------------+--------------+--------+---------------------------------------+--------------+-----------------+----------+-------------------------------+
+| rockylinux/9/ppc64el (1 more) | f69dbc86b419 | yes    | Rockylinux 9 ppc64el (20221210_02:06) | ppc64le      | CONTAINER       | 111.31MB | Dec 10, 2022 at 12:00am (UTC) |
++-------------------------------+--------------+--------+---------------------------------------+--------------+-----------------+----------+-------------------------------+
+$ 
+```
+
+イメージが決まったら `lxc launch` でコンテナを作る
+```
+$ lxc launch images:rockylinux/9 container0 
+Creating the instance    
+$ lxc list                                                                             
++------------+---------+------+----------------------------------+-----------+-----------+ 
+|    NAME    |  STATE  | IPV4 |             IPV6                 |   TYPE    | SNAPSHOTS | 
++------------+---------+------+----------------------------------+-----------+-----------+      
+| container0 | RUNNING |      | 2001:0db8::3eff:fea7:1df3 (eth0) | CONTAINER | 0         |      
++------------+---------+------+----------------------------------+-----------+-----------+  
+```
+
+
+## ホストとコンテナでファイルを共有する
+コンテナ側にホストのディレクトリを生やす。
+```
+lxc config device add container0 devname0 disk source=/host/dir path=/container/dir
+```
+LXC ではディスクデバイスを追加することで共有ディレクトリが作れる。コマンド中の devname0 はデバイスの識別子でユーザが適当に指定すればいい。
+source にはホスト側のディレクトリのパスを指定、path にはコンテナ側のディレクトリを指定する。
+コンテナ側のパスは勝手に作られるのであらかじめ用意する必要はなく、コンテナ側で mount をする必要もない。
+
+なお、source に指定するパスはシンボリックリンクを含まないパスにする必要がある。もし含んでいればデバイスの追加に失敗する。
+
+コンテナ側からファイルを書き込むとホスト側でみた時に適当な uid/gid で書き込まれたように見える。
+これだと不便なので uid/gid をホストとコンテナでマッピングする。
+例えば、ホスト側の uid 1000 と gid 1001 をコンテナ側の root (uid=0, gid=0) にマッピングする場合は以下のようにする。
+```
+$ echo -e "uid 1000 0\ngid 1001 0" | lxc config set container0 raw.idmap -
+```
+
+- lxc config set は `-` を指定することで標準入力から設定を投入できる。
+- uid と gid はそれぞれ１行ずつ記述する必要があるので `echo -e` で改行文字を使って設定する。
+
+## コンテナから cifs を使ってマウントする
+事前にコンテナに設定を入れておくことで cifs とか nfs のファイルサーバをコンテナからマウントすることもできる。
+
+```
+lxc config set container0 raw.apparmor 'mount fstype=cifs,'
+lxc config set container0 security.privileged true
+```
+security.privileged を `true` にする必要がある。
 
 # 参考にしたサイト
  - https://www.hiroom2.com/2018/12/14/fedora-29-lxd-en/
- - https://linuxcontainers.org/ja/lxd/getting-started-cli/
  - https://linuxcontainers.org/ja/lxd/getting-started-cli/
